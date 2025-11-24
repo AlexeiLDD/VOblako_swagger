@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: VOblako Auth API
+  version: "1.0.0"
+  description: >
+    Authentication REST endpoints exposed by the VOblako gateway.
+    All paths in this document are served under the `/api` prefix.
+servers:
+  - url: http://localhost:8080/api
+    description: Local gateway
+tags:
+  - name: auth
+    description: User authentication and session management
+paths:
+  /auth/signup:
+    post:
+      tags: [auth]
+      summary: Register a new user
+      description: >
+        Creates a user account and automatically issues a new session cookie
+        for the caller.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '200':
+          description: Successfully registered and authenticated the user.
+          headers:
+            Set-Cookie:
+              description: Contains the issued `session_id` cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: >
+            Invalid payload, duplicated account or any other user-facing validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Authenticate an existing user
+      description: >
+        Checks user credentials and issues a new `session_id` cookie. If the caller is already
+        authorized, the service returns a 400 error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successfully authenticated and created a new session.
+          headers:
+            Set-Cookie:
+              description: Contains the issued `session_id` cookie.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Wrong credentials, malformed JSON, or already authorized.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/check:
+    get:
+      tags: [auth]
+      summary: Check current session status
+      description: >
+        Returns information about whether the caller has a valid session. The method never fails
+        even if the session is missing or expired.
+      responses:
+        '200':
+          description: Session status and user info (if authenticated).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Terminate the current session
+      description: >
+        Invalidates the current `session_id` cookie. Requires the cookie to be provided.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Session has been invalidated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+        '401':
+          description: Missing or invalid session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session_id
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Numeric user identifier.
+        email:
+          type: string
+          format: email
+      required: [id, email]
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        is_auth:
+          type: boolean
+          description: Indicates whether the caller is authorized.
+      required: [is_auth]
+      description: >
+        Authorization status. The `user` object is only meaningful when `is_auth` is true.
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 32
+      required: [email, password]
+    SignupRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          maxLength: 32
+        password_repeat:
+          type: string
+          minLength: 8
+          maxLength: 32
+      required: [email, password, password_repeat]
+    EmptyResponse:
+      type: object
+      nullable: true
+      additionalProperties: false
+      description: The API responds with a JSON `null` payload on success.
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Human-readable error status.
+          enum:
+            - Server error
+            - User already authorized
+            - User not authorized
+            - Password must have length between 8 and 32 symbols
+            - Passwords do not match
+            - Wrong credentials
+            - User with this email already exists
+            - Wrong JSON format
+      required: [status]

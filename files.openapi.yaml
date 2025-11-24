@@ -1,0 +1,397 @@
+openapi: 3.0.3
+info:
+  title: VOblako File API
+  version: "1.0.0"
+  description: >
+    File management REST endpoints exposed by the VOblako gateway.
+    All paths in this document are served under the `/api` prefix and require an authenticated session.
+servers:
+  - url: http://localhost:8080/api
+    description: Local gateway
+security:
+  - sessionCookie: []
+tags:
+  - name: files
+    description: File upload, download, metadata and lifecycle operations.
+paths:
+  /files:
+    post:
+      tags: [files]
+      summary: Upload a new file
+      description: >
+        Accepts a multipart form with a single `file` part and creates a file owned by the current user.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: File uploaded successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileMetadata'
+        '400':
+          description: Bad form data or invalid filename.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /files/list:
+    post:
+      tags: [files]
+      summary: List accessible files
+      description: >
+        Returns metadata for the caller's files using pagination options supplied in the request body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilesListOptions'
+      responses:
+        '200':
+          description: List of file metadata.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FileMetadata'
+        '400':
+          description: Malformed JSON payload or invalid pagination parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /files/{id}:
+    get:
+      tags: [files]
+      summary: Download a file
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      responses:
+        '200':
+          description: Raw file bytes and metadata in headers.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid file identifier format.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller does not have access to the requested file.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags: [files]
+      summary: Replace file contents
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: File contents updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+        '400':
+          description: Invalid identifier or malformed form data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller does not have access to the requested file.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags: [files]
+      summary: Delete a file
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      responses:
+        '200':
+          description: File deleted (soft deletion) successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+        '400':
+          description: Invalid file identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller does not have access to the requested file.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /files/{id}/meta:
+    get:
+      tags: [files]
+      summary: Fetch file metadata
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      responses:
+        '200':
+          description: File metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileMetadata'
+        '400':
+          description: Invalid file identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller does not have access to the requested file.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /files/{id}/name:
+    post:
+      tags: [files]
+      summary: Rename a file
+      parameters:
+        - $ref: '#/components/parameters/FileID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFilenameRequest'
+      responses:
+        '200':
+          description: Filename updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmptyResponse'
+        '400':
+          description: Invalid identifier, JSON body, or filename constraints violated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Missing or invalid session cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: The caller does not have access to the requested file.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session_id
+  parameters:
+    FileID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: File identifier (UUID string).
+  schemas:
+    FileMetadata:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        owner_id:
+          type: integer
+          format: int64
+        filename:
+          type: string
+        content_type:
+          type: string
+        size:
+          type: integer
+          format: int64
+        is_deleted:
+          type: boolean
+        upload_time:
+          type: string
+          format: date-time
+        update_time:
+          type: string
+          format: date-time
+        deleted_time:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - uuid
+        - owner_id
+        - filename
+        - content_type
+        - size
+        - is_deleted
+        - upload_time
+        - update_time
+    FilesListOptions:
+      type: object
+      properties:
+        limit:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Maximum number of records to return.
+        offset:
+          type: integer
+          format: int32
+          minimum: 0
+          description: How many entries to skip before starting to collect the result set.
+        with_deleted:
+          type: boolean
+          description: Whether to include soft-deleted files in the result.
+    UpdateFilenameRequest:
+      type: object
+      properties:
+        filename:
+          type: string
+          minLength: 1
+          maxLength: 50
+          description: New filename.
+      required: [filename]
+    EmptyResponse:
+      type: object
+      nullable: true
+      additionalProperties: false
+      description: The API responds with a JSON `null` payload on success.
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Human-readable error status.
+          enum:
+            - Server error
+            - User not authorized
+            - User have no access to this content
+            - Filename must have length between 1 and 50
+            - Wrong form format
+            - Wrong JSON format
+            - Invalid ID format
+            - Invalid URL params
+      required: [status]
